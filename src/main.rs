@@ -7,13 +7,13 @@ use ObjectType::{Box as B, Gool as G, None as N, Player as P, Wall as W};
 const STAGE_LIST: [Field; 2] = [
     [
         [W, W, W, W, W, W, W, W, W, W, W, W, W, W, W],
-        [W, N, N, N, N, N, N, N, N, N, N, N, N, G, W],
+        [W, P, N, N, N, N, N, N, N, N, N, N, N, G, W],
         [W, N, N, N, N, N, N, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, N, N, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, W, B, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, N, N, N, N, N, W],
-        [W, P, N, N, N, W, B, N, N, N, N, N, N, N, W],
+        [W, N, N, N, N, W, B, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, N, N, N, N, N, N, N, N, N, W],
@@ -24,13 +24,13 @@ const STAGE_LIST: [Field; 2] = [
     ],
     [
         [W, W, W, W, W, W, W, W, W, W, W, W, W, W, W],
-        [W, N, N, N, N, N, N, N, N, N, N, N, N, G, W],
+        [W, P, N, N, N, N, N, N, N, N, N, N, N, G, W],
         [W, N, N, N, N, N, N, N, N, N, N, N, N, N, W],
         [W, N, N, N, N, W, W, W, W, W, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, W, N, N, N, N, W],
         [W, N, N, N, N, W, B, N, N, W, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, W, N, N, N, N, W],
-        [W, P, N, N, N, W, B, N, N, W, N, N, N, N, W],
+        [W, N, N, N, N, W, B, N, N, W, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, W, N, N, N, N, W],
         [W, N, N, N, N, W, N, N, N, W, N, N, N, N, W],
         [W, N, N, N, N, N, N, N, N, N, N, N, N, N, W],
@@ -45,7 +45,7 @@ const PLAYER_INITIAL_POSITION: Position = Position { x: 1, y: 1 };
 
 type Field = [[ObjectType; 15]; 15];
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Position {
     x: usize,
     y: usize,
@@ -54,6 +54,7 @@ struct Position {
 struct Game {
     field: Field,
     position: Position,
+    b_position: Position,
     move_direction: Direction,
     stage: usize,
 }
@@ -123,6 +124,7 @@ impl Game {
         Game {
             field: STAGE_LIST[0],
             position: PLAYER_INITIAL_POSITION,
+            b_position: PLAYER_INITIAL_POSITION,
             move_direction: Direction::Right,
             stage: 0,
         }
@@ -143,31 +145,28 @@ impl Game {
             }
             println!()
         }
+        println!("{}", self.stage);
     }
 
     fn move_player(&mut self) {
-        for (y_i, y_iter) in self.field.into_iter().enumerate() {
-            if let Some(x_i) = y_iter.iter().position(|&v| v == ObjectType::Player) {
-                self.field[y_i][x_i] = ObjectType::None;
+        self.field[self.b_position.y][self.b_position.x] = ObjectType::None;
 
-                let field = self.field;
+        let field = self.field;
 
-                // プレイヤーの移動する位置にBoxがあるなら
-                let player_x = self.position.x;
-                let player_y = self.position.y;
-                if field[player_y][player_x] == ObjectType::Box {
-                    let Position { x, y } = self.direction();
-                    // 移動する一つ先に壁or Boxがあるなら
-                    if field[y][x] == ObjectType::Wall || field[y][x] == ObjectType::Box {
-                        self.undo_position();
-                    } else {
-                        // ないなら
-                        self.field[y][x] = ObjectType::Box;
-                    }
-                }
-                self.field[self.position.y][self.position.x] = ObjectType::Player;
+        // プレイヤーの移動する位置にBoxがあるなら
+        let player_x = self.position.x;
+        let player_y = self.position.y;
+        if field[player_y][player_x] == ObjectType::Box {
+            let Position { x, y } = self.direction();
+            // 移動する一つ先に壁or Boxがあるなら
+            if field[y][x] == ObjectType::Wall || field[y][x] == ObjectType::Box {
+                self.undo_position();
+            } else {
+                // ないなら
+                self.field[y][x] = ObjectType::Box;
             }
         }
+        self.field[self.position.y][self.position.x] = ObjectType::Player;
     }
     // プレイヤーの進んだ方向の位置を返す
     const fn direction(&self) -> Position {
@@ -182,12 +181,7 @@ impl Game {
     }
     // プレイヤーの位置を前の場所に戻す
     fn undo_position(&mut self) {
-        match self.move_direction {
-            Direction::Left => self.position.right(),
-            Direction::Right => self.position.left(),
-            Direction::Down => self.position.up(),
-            Direction::Up => self.position.down(),
-        }
+        self.position = self.b_position;
     }
     fn left(&mut self) {
         self.position.left();
@@ -208,9 +202,10 @@ impl Game {
 
     fn next_stage(&mut self) {
         self.stage += 1;
-        if STAGE_LIST.len() < self.stage {
+        if STAGE_LIST.len() - 1 < self.stage {
             self.stage = 0;
         }
+        self.field = STAGE_LIST[self.stage];
     }
 }
 
@@ -223,6 +218,8 @@ fn main() {
     loop {
         game.move_player();
         game.draw();
+
+        game.b_position = game.position;
 
         match getch_rs::Getch::new().getch() {
             Ok(Key::Char('j')) | Ok(Key::Left) => game.left(),
